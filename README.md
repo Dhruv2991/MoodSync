@@ -64,7 +64,6 @@ moodsync/
 ├── frontend/ # React UI
 ├── backend/ # API & recommendation logic
 ├── emotion/ # Emotion detection module
-├── dataset/ # Song data / resources
 └── README.md
 
 
