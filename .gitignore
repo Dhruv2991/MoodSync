@@ -1,4 +1,6 @@
-# Logs
+############################
+# 🔥 Logs
+############################
 logs
 *.log
 npm-debug.log*
@@ -7,18 +9,75 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+############################
+# ⚛️ Node / Frontend (React/Vite)
+############################
+node_modules/
+dist/
+dist-ssr/
+build/
+coverage/
 *.local
 
-# Editor directories and files
+############################
+# 🐍 Python / Backend
+############################
+venv/
+.venv/
+env/
+emotion/venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+*.db
+
+############################
+# 🧠 ML / Heavy Files (IMPORTANT)
+############################
+*.h5
+*.pt
+*.pth
+*.ckpt
+*.pb
+*.onnx
+
+############################
+# 🔐 Environment variables
+############################
+.env
+*.env
+
+############################
+# 🧾 OS / System files
+############################
+.DS_Store
+Thumbs.db
+
+############################
+# 🧑‍💻 IDE / Editor files
+############################
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+############################
+# 📦 Misc
+############################
+*.zip
+*.tar
+*.gz
+*.rar
+
+############################
+# 🚫 Optional (uncomment if needed)
+############################
+# public/songs/
+# dataset/
+# uploads/

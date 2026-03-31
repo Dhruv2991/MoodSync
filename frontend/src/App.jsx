@@ -1,97 +1,240 @@
-import React, { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
-
-// Dynamic Visualizer Component
-const Visualizer = () => (
-  <div className="visualizer">
-    {[...Array(10)].map((_, i) => (
-      <div key={i} className="bar" style={{ animationDelay: `${i * 0.05}s` }}></div>
-    ))}
-  </div>
-);
 
 function App() {
   const [emotion, setEmotion] = useState("happy");
+  const [confidence, setConfidence] = useState(0);
   const [mode, setMode] = useState("match");
-  const [isChanging, setIsChanging] = useState(false);
+  const [songs, setSongs] = useState([]);
+  const [currentSong, setCurrentSong] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [loadingEmotion, setLoadingEmotion] = useState(false);
+  const [loadingSongs, setLoadingSongs] = useState(false);
+  const [error, setError] = useState("");
 
-  // Your original mood data structure
-  const moodData = {
-    happy: { confidence: 92, match: [{ title: "Electric Sky", artist: "Neon", link: "#" }, { title: "Joy Ride", artist: "Solar", link: "#" }, { title: "Vibe", artist: "Luna", link: "#" }], change: [{ title: "Deep Zen", artist: "Mantra", link: "#" }, { title: "Focus", artist: "Neural", link: "#" }, { title: "Still", artist: "Void", link: "#" }] },
-    sad: { confidence: 88, match: [{ title: "Midnight", artist: "Echo", link: "#" }, { title: "Rain", artist: "Noir", link: "#" }, { title: "Cold", artist: "Static", link: "#" }], change: [{ title: "Horizon", artist: "Hope", link: "#" }, { title: "Spark", artist: "Ignite", link: "#" }, { title: "Bloom", artist: "Petal", link: "#" }] },
-    stressed: { confidence: 85, match: [{ title: "Breathing", artist: "Soft", link: "#" }, { title: "Piano", artist: "Keys", link: "#" }, { title: "Mist", artist: "Aura", link: "#" }], change: [{ title: "Turbo", artist: "Engine", link: "#" }, { title: "Rush", artist: "Sonic", link: "#" }, { title: "Power", artist: "Volt", link: "#" }] },
+  const audioRef = useRef(null);
+
+  const getExplanation = () => {
+    if (emotion === "happy" && mode === "match") {
+      return "You seem happy. We are recommending energetic songs to match your mood.";
+    }
+    if (emotion === "happy" && mode === "change") {
+      return "You seem happy. We are recommending focus-friendly songs to calm and balance your energy.";
+    }
+    if (emotion === "sad" && mode === "match") {
+      return "You seem sad. We are recommending soft and comforting songs to match your mood.";
+    }
+    if (emotion === "sad" && mode === "change") {
+      return "You seem sad. We are recommending uplifting songs to improve your mood.";
+    }
+    if (emotion === "stressed" && mode === "match") {
+      return "You seem stressed. We are recommending calming songs to help you relax.";
+    }
+    if (emotion === "stressed" && mode === "change") {
+      return "You seem stressed. We are recommending light refreshing songs to reset your mood.";
+    }
+    return "Mood-based recommendations are active.";
+  };
+
+  const fetchEmotion = async () => {
+    try {
+      setLoadingEmotion(true);
+      setError("");
+
+      const res = await fetch("http://127.0.0.1:8000/emotion");
+      if (!res.ok) {
+        throw new Error("Failed to fetch emotion");
+      }
+
+      const data = await res.json();
+
+      const detectedEmotion = ["happy", "sad", "stressed"].includes(data.emotion)
+        ? data.emotion
+        : "stressed";
+
+      setEmotion(detectedEmotion);
+      setConfidence(data.confidence || 0);
+    } catch (err) {
+      setError("Could not fetch emotion data");
+      console.error(err);
+    } finally {
+      setLoadingEmotion(false);
+    }
+  };
+
+  const fetchSongs = async () => {
+    try {
+      setLoadingSongs(true);
+      setError("");
+
+      const res = await fetch(
+        `http://127.0.0.1:5000/recommend?emotion=${emotion}&mode=${mode}`
+      );
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch songs");
+      }
+
+      const data = await res.json();
+      setSongs(data.songs || []);
+    } catch (err) {
+      setError("Could not fetch recommended songs");
+      setSongs([]);
+      console.error(err);
+    } finally {
+      setLoadingSongs(false);
+    }
   };
 
   useEffect(() => {
-    setIsChanging(true);
-    const timer = setTimeout(() => setIsChanging(false), 500);
-    return () => clearTimeout(timer);
-  }, [emotion]);
+    fetchEmotion();
+    const interval = setInterval(fetchEmotion, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
-  const currentSongs = moodData[emotion][mode];
+  useEffect(() => {
+    fetchSongs();
+  }, [emotion, mode]);
+
+  useEffect(() => {
+    if (currentSong && audioRef.current) {
+      audioRef.current.load();
+      audioRef.current
+        .play()
+        .then(() => {
+          setIsPlaying(true);
+        })
+        .catch((err) => {
+          console.error("Audio play error:", err);
+          setError("Audio could not be played");
+        });
+    }
+  }, [currentSong]);
+
+  const handlePlaySong = (song) => {
+    setError("");
+
+    if (currentSong?.file === song.file) {
+      if (audioRef.current) {
+        if (isPlaying) {
+          audioRef.current.pause();
+          setIsPlaying(false);
+        } else {
+          audioRef.current
+            .play()
+            .then(() => setIsPlaying(true))
+            .catch((err) => {
+              console.error("Resume play error:", err);
+              setError("Audio could not be played");
+            });
+        }
+      }
+      return;
+    }
+
+    setCurrentSong(song);
+  };
 
   return (
     <div className={`app ${emotion}`}>
-      {/* Dynamic Waveform Background */}
-      <div className="waveform-container">
-        <div className="wave"></div>
-      </div>
-
-      <div className={`transition-overlay ${isChanging ? 'flash-active' : ''}`}></div>
-
       <div className="overlay">
-        <header className="header" style={{textAlign: 'left', marginBottom: '60px'}}>
-          <div style={{display: 'flex', alignItems: 'center', gap: '30px'}}>
-            <h1>MOODSYNC</h1>
-            <Visualizer />
-          </div>
-          <p style={{opacity: 0.5, letterSpacing: '4px'}}>NEURAL_PROCESSING_ACTIVE // {emotion.toUpperCase()}</p>
+        <header className="header">
+          <h1>MoodSync 🎧</h1>
+          <p>Real-time emotion-based smart music recommendation</p>
         </header>
 
+        {error && <p className="error-text">{error}</p>}
+
         <main className="main-grid">
-          <section className="card">
-            <h2 style={{fontSize: '0.8rem', opacity: 0.6, letterSpacing: '2px', marginBottom: '20px'}}>VISION_AI_FEED</h2>
+          <section className="card camera-card">
+            <h2>Live Emotion Detection</h2>
+
             <div className="camera-box">
-              <div className="scan-line"></div>
-              <p style={{zIndex: 2, fontSize: '0.7rem', color: 'var(--current-glow)', fontWeight: 'bold'}}>BIOMETRIC_LOCK_ACTIVE</p>
-            </div>
-            
-            <div style={{marginTop: '20px'}}>
-              <h3 style={{fontSize: '2.5rem'}}>{emotion.toUpperCase()}</h3>
-              <p style={{opacity: 0.7}}>Confidence: {moodData[emotion].confidence}%</p>
+              <p>{loadingEmotion ? "Detecting emotion..." : "Emotion API Active"}</p>
             </div>
 
-            <div style={{display: 'flex', gap: '10px', marginTop: '30px'}}>
-              {['happy', 'sad', 'stressed'].map(m => (
-                <button key={m} onClick={() => setEmotion(m)} className={emotion === m ? 'active-btn' : ''}>{m}</button>
-              ))}
+            <div className="emotion-info">
+              <h3>Detected Emotion: {emotion.toUpperCase()}</h3>
+              <p>Confidence: {confidence}%</p>
+            </div>
+
+            <div className="demo-buttons">
+              <button onClick={fetchEmotion}>Refresh Emotion</button>
             </div>
           </section>
 
-          <section className="card">
-            <h2 style={{fontSize: '0.8rem', opacity: 0.6, letterSpacing: '2px', marginBottom: '30px'}}>CONTROL_LOGIC</h2>
-            <div style={{display: 'flex', gap: '10px', marginBottom: '30px'}}>
-              <button className={mode === "match" ? "active-btn" : ""} onClick={() => setMode("match")}>Match</button>
-              <button className={mode === "change" ? "active-btn" : ""} onClick={() => setMode("change")}>Shift</button>
+          <section className="card controls-card">
+            <h2>Recommendation Mode</h2>
+
+            <div className="mode-buttons">
+              <button
+                className={mode === "match" ? "active-btn" : ""}
+                onClick={() => setMode("match")}
+              >
+                Match Mood
+              </button>
+
+              <button
+                className={mode === "change" ? "active-btn" : ""}
+                onClick={() => setMode("change")}
+              >
+                Change Mood
+              </button>
             </div>
-            <p style={{lineHeight: '1.6', fontSize: '1.1rem'}}>
-              System is currently adjusting your audio frequencies to <strong>{mode}</strong> your current state.
-            </p>
+
+            <div className="explanation-box">
+              <p>{getExplanation()}</p>
+            </div>
           </section>
 
-          <section className="card" style={{gridColumn: 'span 2'}}>
-            <h2 style={{fontSize: '0.8rem', opacity: 0.6, letterSpacing: '2px', marginBottom: '30px'}}>CURATED_NEURAL_TRACKS</h2>
-            <div className="songs-list">
-              {currentSongs.map((song, i) => (
-                <div className="song-item" key={i}>
-                   <div>
-                      <h3 style={{fontSize: '1.2rem', margin: 0}}>{song.title}</h3>
-                      <p style={{opacity: 0.5, margin: 0}}>{song.artist}</p>
-                   </div>
-                   <a href={song.link} className="active-btn" style={{padding: '10px 20px', textDecoration: 'none', borderRadius: '10px', fontSize: '0.8rem'}}>STREAM</a>
-                </div>
-              ))}
-            </div>
+          <section className="card songs-card">
+            <h2>Recommended Songs</h2>
+
+            {loadingSongs ? (
+              <p>Loading songs...</p>
+            ) : songs.length === 0 ? (
+              <p>No songs available for this mood right now.</p>
+            ) : (
+              <div className="songs-list">
+                {songs.map((song, index) => (
+                  <div className="song-item" key={index}>
+                    <div>
+                      <h3>{song.title}</h3>
+                      <p>{song.artist}</p>
+                      <small>{song.file}</small>
+                    </div>
+
+                    <button className="play-btn" onClick={() => handlePlaySong(song)}>
+                      {currentSong?.file === song.file && isPlaying ? "Pause" : "Play"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="card player-card">
+            <h2>Now Playing</h2>
+
+            {currentSong ? (
+              <div className="now-playing">
+                <h3>{currentSong.title}</h3>
+                <p>{currentSong.artist}</p>
+
+                <audio
+                  ref={audioRef}
+                  controls
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  onEnded={() => setIsPlaying(false)}
+                >
+                  <source src={currentSong.file} type="audio/mpeg" />
+                  Your browser does not support the audio element.
+                </audio>
+              </div>
+            ) : (
+              <p>No song selected yet.</p>
+            )}
           </section>
         </main>
       </div>
